@@ -4,85 +4,12 @@
 #include "matrix/math.hpp"
 #include "oversampling.hpp"
 
-struct StereoInHandler : Input {
-
-	Input * input;
-
-	void configure(Input * inputJack) {
-		input = inputJack;
-	}
-
-	float_4 getLeft(int polySection) {
-		polySection &= 1;
-		return input->getVoltageSimd<float_4>(polySection * 4);
-	}
-
-	float_4 getRight(int polySection) {
-		polySection &= 1;
-		return input->getVoltageSimd<float_4>(8 + polySection * 4);
-	}
-
-	float getLeft(void) {
-		return input->getVoltage(0);
-	}
-
-	float getRight(void) {
-		return input->getVoltage(8);
-	}
-
-	float_4 getLeftNormal(float_4 normal, int polySection) {
-		polySection &= 1;
-		return input->getNormalVoltageSimd<float_4>(normal, polySection * 4);
-	}
-
-	float_4 getRightNormal(float_4 normal, int polySection) {
-		polySection &= 1;
-		return input->getNormalVoltageSimd<float_4>(normal, 8 + polySection * 4);
-	}
-
-	float getLeftNormal(float normal) {
-		return input->getNormalVoltage(normal, 0);
-	}
-
-	float getRightNormal(float normal) {
-		return input->getNormalVoltage(normal, 8);
-	}
-
-};
-
-struct StereoOutHandler : Output {
-
-	Output * output;
-
-	void configure(Output * outputJack) {
-		output = outputJack;
-	}
-
-	void setLeft(float_4 value, int polySection) {
-		polySection &= 1;
-		return output->setVoltageSimd<float_4>(value, polySection * 4);
-	}
-
-	void setRight(float_4 value, int polySection) {
-		polySection &= 1;
-		return output->setVoltageSimd<float_4>(value, 8 + polySection * 4);
-	}
-
-	void setLeft(float value) {
-		return output->setVoltage(value, 0);
-	}
-
-	void setRight(float value) {
-		return output->setVoltage(value, 8);
-	}
-
-};
-
-//
-// DSP shit
-//
-
-template <typename T = float_4, typename I = int32_4>
+// Sine approximation conducive to vectorization (no lookup tables)
+// Inputs
+// in: sine phase [0, 1]
+// Result:
+// Return sin(in * 2pi)
+template <typename T = float, typename I = int32_t>
 T bhaskaraSine(T in) {
 
 	I phaseHalf = abs(I(floor(in)));
@@ -96,8 +23,15 @@ T bhaskaraSine(T in) {
 
 }
 
+// Bandlimited hyperbolic tangent waveshaper
+// From REDUCING THE ALIASING OF NONLINEAR WAVESHAPING USING CONTINUOUS-TIME CONVOLUTION
+// Julian D. Parker, Vadim Zavalishin, Efflam Le Bivic
+// https://www.dafx.de/paper-archive/2016/dafxpapers/20-DAFx-16_paper_41-PN.pdf
+// TODO: specify input and output signal ranges
 template <typename T = float>
 struct TanhBL {
+
+// TODO: add optimized methods for exp now that this has been removed from the Rack DSP namespace
 
 	T lastIn = T(0);
 
@@ -115,6 +49,8 @@ struct TanhBL {
 
 	T process(T in) {
 
+// TODO: add ifelse, again because this has been removed from Rack
+
 		T out = ifelse(abs(in - lastIn) < .000001f, (tanh(in) + tanh(lastIn)) / 2, (tanhI(in) - tanhI(lastIn))/(in - lastIn));
 		lastIn = in;
 		return out;
@@ -122,8 +58,16 @@ struct TanhBL {
 
 };
 
+// Bandlimited zener diode clipper simulation
+// Based on REDUCING THE ALIASING OF NONLINEAR WAVESHAPING USING CONTINUOUS-TIME CONVOLUTION
+// Julian D. Parker, Vadim Zavalishin, Efflam Le Bivic
+// https://www.dafx.de/paper-archive/2016/dafxpapers/20-DAFx-16_paper_41-PN.pdf
+// This particular nonlinear model is original to the author
+// TODO: specify input and output signal ranges
 template <typename T = float>
 struct ZenerClipperBL {
+
+// TODO: ifelse implementation
 
 	T lastIn = T(0);
 
@@ -146,8 +90,7 @@ struct ZenerClipperBL {
 
 };
 
-// One pole allpass
-
+// Trivial discrete one pole allpass used in naive phaser
 template <typename T = float>
 struct AP1 {
 
@@ -169,6 +112,9 @@ struct AP1 {
 
 // Naive impementation
 // shoving the delay in the feedback path makes this unstable
+// TODO: check paramter details
+// Call setParams to update parameters with freq in [0, 1] (mapped to [0, samplerate]) and fb in [0, 1]
+// Call process(input) to process input and return the output of the phaser 
 template <typename T = float>
 struct fourPolePhaser {
 
@@ -202,7 +148,7 @@ struct fourPolePhaser {
 // state space 4 pole filter cooked up from https://github.com/google/music-synthesizer-for-android/blob/master/lab/Zero%20delay%20the%20easy%20way.ipynb
 // aka "Zero delay the easy way"
 // float only no vectors
-
+// TODO document usage
 struct ZDFPhaser4 {
 
 	// analog state space prototype
@@ -305,7 +251,7 @@ struct ZDFPhaser4 {
 };
 
 // same thing, 8 pole prototype
-
+// TODO document usage
 struct ZDFPhaser8 {
 
 	float A[64] = {-1, 0, 0, 0, 0, 0, 0, 0,
@@ -387,7 +333,7 @@ struct ZDFPhaser8 {
 };
 
 // Classic maligned JOS Chamberlin SVF discretized with forward/backward euler, unstable above ~ sr/6
-
+// TODO document usage
 template <typename T = float>
 struct JOSSVF {
 
@@ -448,7 +394,7 @@ struct JOSSVF {
 // Includes some trivial modifications to https://github.com/google/music-synthesizer-for-android/blob/master/lab/Second%20order%20sections%20in%20matrix%20form.ipynb
 // for simultaineuous outputs from same state/transition matrix
 // nice and stable and linear
-
+// TODO document usage
 template <typename T = float>
 struct ZDFSVF {
 
@@ -531,7 +477,7 @@ struct ZDFSVF {
 };
 
 /// Delay Line
-
+// TODO document usage
 template <typename T = float>
 struct Delay {
 
@@ -577,7 +523,7 @@ struct Delay {
 // from DAFX '18 Holters and Parker "Combined Model for a Bucket Brigade Device and its Input and Output Filters"
 // a bit excessive because it allows the filters to be designed from an arbitrary PFE
 // but PFE input functionality is not quite there, yet
-
+// TODO document usage
 template <typename T = float, int SIZE = 256, int R_IN = 1, int C_IN = 2, int R_OUT = 1, int C_OUT = 2>
 struct BBD {
 
