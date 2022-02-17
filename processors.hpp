@@ -1,8 +1,11 @@
 #ifndef STARLING_DSP_HPP
 #define STARLING_DSP_HPP
 
-#include "matrix/math.hpp"
+#include "Matrix/matrix/math.hpp"
 #include "oversampling.hpp"
+
+// TEMPORARY
+#include "plugin.hpp"
 
 // Sine approximation conducive to vectorization (no lookup tables)
 // Inputs
