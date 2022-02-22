@@ -6,6 +6,7 @@
 
 // TEMPORARY
 #include "plugin.hpp"
+using namespace rack::simd;
 
 // Sine approximation conducive to vectorization (no lookup tables)
 // Inputs
