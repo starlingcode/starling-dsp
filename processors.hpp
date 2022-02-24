@@ -1,6 +1,14 @@
 #ifndef STARLING_DSP_HPP
 #define STARLING_DSP_HPP
 
+/*
+
+A collection of audio processors written for various Starling projects, namely the virtual analog models of the TRS modules in Rack by VCV.
+Most processors are implemented as classes with initialization in the constructor, functions to set parameters if applicable, and a process function that takes an input sample and returns an output sample.
+The user can then implement a buffer based processing scheme as needed, or the routines are already maximally efficient in a single-sample context like Rack.
+
+*/
+
 #include "Matrix/matrix/math.hpp"
 #include "oversampling.hpp"
 

@@ -1,10 +1,19 @@
+#ifndef __STARLING_DSP_OVERSAMPLING
+#define __STARLING_DSP_OVERSAMPLING
+
+/*
+
+An efficient upsampler/decimator pair for sample rate changes that are powers of two using elliptic half band filters constructed from first order allpass sections
+Implemented from scratch rather than copying the common implementations for learning practices
+From Fredrick Harris Multirate Signal Processing for Communication Systems
+Original paper with AG Constantinides
+https://www.researchgate.net/publication/259753999_Digital_Signal_Processing_with_Efficient_Polyphase_Recursive_All-pass_Filters
+
+*/
 
 
+// TODO: Refactor out this rack-specific namespace for vector functions
 using simd::float_4;
-
-// From Fredrick Harris Multirate Signal Processing for Communication Systems
-// Original paper with AG Constantinides
-// https://www.researchgate.net/publication/259753999_Digital_Signal_Processing_with_Efficient_Polyphase_Recursive_All-pass_Filters
 
 template <typename T = float>
 struct APPath1 {
@@ -431,3 +440,5 @@ struct UpsamplePow2 {
 	}
 	
 };
+
+#endif // __STARLING_DSP_OVERSAMPLING

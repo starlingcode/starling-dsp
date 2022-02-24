@@ -1,6 +1,8 @@
 #pragma once
 #include <dsp/common.hpp>
 
+// A helper class for the polynomial-approximated bland limited ramp (aka polyblamp) used for efficient band limited triangle and trapezoid waveforms in the Via plugins in Rack
+
 template <typename T = float>
 struct PolyBlampGenerator {
 	T buf[64] = {};
