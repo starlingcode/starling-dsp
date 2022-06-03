@@ -9,7 +9,7 @@ The user can then implement a buffer based processing scheme as needed, or the r
 
 */
 
-#include "Matrix/matrix/math.hpp"
+// #include "Matrix/matrix/math.hpp"
 #include "oversampling.hpp"
 
 // TEMPORARY
@@ -157,192 +157,192 @@ struct fourPolePhaser {
 
 };
 
-// state space 4 pole filter cooked up from https://github.com/google/music-synthesizer-for-android/blob/master/lab/Zero%20delay%20the%20easy%20way.ipynb
-// aka "Zero delay the easy way"
-// float only no vectors
-// TODO document usage
-struct ZDFPhaser4 {
-
-	// analog state space prototype
-	// extended from first order section
-	// ap = lp - hp = lp - (in - lp) = 2*lp - in
-	// A = [-1], B = [1], C = [2], D = [-1]
-
-	float A[16] = {-1, 0, 0, 0,
-              	    2, -1, 0, 0,
-              	   -2, 2, -1, 0,
-              	    2, -2, 2, -1};
-	float B[4] = {1, -1, 1, -1};
-	float C[4] = {-2, 2, -2, 2};
-	float D = 1;
-
-	// storage bins for discretized matrixes
-	float Az[16] = {-1, 0, 0, 0,
-              	     2, -1, 0, 0,
-              	    -2, 2, -1, 0,
-              	     2, -2, 2, -1};
-	float Bz[4] = {1, -1, 1, -1};
-	float Cz[4] = {-2, 2, -2, 2};
-	float Dz = 1;
-
-	float X[4] = {0, 0, 0, 0};
-
-	// discretize with bilinear transform
-
-	void setParams(float freq, float res) {
-
-		// freq normalized to sr
-		// prewarp for bilinear transform
-		float g = tan(M_PI * freq);
-		// printf("g: %4.4f \n", g);
-
-		// sneak in the feedback gain as res 0 - 1
-		A[3] = -res;
-
-		// Inv = (I - gA)^(-1)
-		// Inverting the transition matrix solves the system of differential equations
-		matrix::SquareMatrix<float, 4> Ag(A);
-		Ag *= g;
-		matrix::SquareMatrix<float, 4> Inv;
-    	Inv.setIdentity();
-    	Inv -= Ag;
-    	Inv = matrix::inv(Inv);
-
-    	// discretize the transition matrix
-    	// Az = Inv * (I + gA)
-    	matrix::SquareMatrix<float, 4> A_;
-    	A_.setIdentity();
-    	A_ += Ag;
-    	A_ = Inv * A_;
-
-    	// discretize the input vector (column)
-    	// Bz = 2g * Inv * B
-    	matrix::Vector<float, 4> Bs(B);
-    	matrix::Vector<float, 4> B_;
-    	B_ = 2 * g * Inv * Bs;
-
-    	// discretize the output vector (row)
-    	// Cz = C * Inv
-    	matrix::Matrix<float, 1, 4> C_;
-    	matrix::Vector<float, 4> Cs(C);
-    	C_ = Cs.T() * Inv;
-
-    	// Calculate the direct input feedthrough
-    	// Prototype D is added when storing
-    	// Dz = g * C * Inv * B + D
-    	matrix::Matrix<float, 1, 1> D_;
-    	D_ = Cs.T() * Inv * (g * Bs);
-    	
-    	// store above calculations 
-    	A_.copyTo(Az);
-    	B_.copyTo(Bz);
-    	C_.copyTo(Cz);
-    	Dz = D_(0, 0) + D;
-
-	}
-
-	float process(float in) {
-
-		// calculate output from current state and current input 
-		matrix::Vector<float, 4> X_(X);
-		matrix::Vector<float, 4> C_(Cz);
-		float out = in * Dz + X_.dot(C_);
-
-		// update the state for the next input from current input and transition matrix
-		matrix::SquareMatrix<float, 4> A_(Az);
-		matrix::Vector<float, 4> B_(Bz);
-		X_ = A_ * X_ + in * B_;
-		// store it
-		X_.copyTo(X);
-
-		// return the output from the first section		
-		return out;
-
-	}
-
-};
-
-// same thing, 8 pole prototype
-// TODO document usage
-struct ZDFPhaser8 {
-
-	float A[64] = {-1, 0, 0, 0, 0, 0, 0, 0,
-              		2, -1, 0, 0, 0, 0, 0, 0,
-              		-2, 2, -1, 0, 0, 0, 0, 0,
-              		2, -2, 2, -1, 0, 0, 0, 0,
-              		-2, 2, -2, 2, -1, 0, 0, 0,
-              		2, -2, 2, -2, 2, -1, 0, 0,
-              		-2, 2, -2, 2, -2, 2, -1, 0,
-              		2, -2, 2, -2, 2, -2, 2, -1};
-	float B[8] = {1, -1, 1, -1, 1, -1, 1, -1};
-	float C[8] = {-2, 2, -2, 2, -2, 2, -2, 2};
-	float D = 1;
-
-	float Az[64] = {-1, 0, 0, 0, 0, 0, 0, 0,
-              		2, -1, 0, 0, 0, 0, 0, 0,
-              		-2, 2, -1, 0, 0, 0, 0, 0,
-              		2, -2, 2, -1, 0, 0, 0, 0,
-              		-2, 2, -2, 2, -1, 0, 0, 0,
-              		2, -2, 2, -2, 2, -1, 0, 0,
-              		-2, 2, -2, 2, -2, 2, -1, 0,
-              		2, -2, 2, -2, 2, -2, 2, -1};
-	float Bz[8] = {1, -1, 1, -1};
-	float Cz[8] = {-2, 2, -2, 2};
-	float Dz = 1;
-
-	float X[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-
-	void setParams(float freq, float res) {
-
-		float g = tan(M_PI * freq);
-
-		A[7] = -res;
-
-		matrix::SquareMatrix<float, 8> Ag(A);
-		Ag *= g;
-		matrix::SquareMatrix<float, 8> Inv;
-    	Inv.setIdentity();
-    	Inv -= Ag;
-    	Inv = matrix::inv(Inv);
-
-    	matrix::SquareMatrix<float, 8> A_;
-    	A_.setIdentity();
-    	A_ += Ag;
-    	A_ = Inv * A_;
-
-    	matrix::Vector<float, 8> Bs(B);
-    	matrix::Vector<float, 8> B_;
-    	B_ = 2 * g * Inv * Bs;
-
-    	matrix::Matrix<float, 1, 8> C_;
-    	matrix::Vector<float, 8> Cs(C);
-    	C_ = Cs.T() * Inv;
-
-    	matrix::Matrix<float, 1, 1> D_;
-    	D_ = Cs.T() * Inv * (g * Bs);
-
-    	A_.copyTo(Az);
-    	B_.copyTo(Bz);
-    	C_.copyTo(Cz);
-    	Dz = D_(0, 0) + D;
-
-	}
-
-	float process(float in) {
-
-		matrix::Vector<float, 8> X_(X);
-		matrix::Vector<float, 8> C_(Cz);
-		float out = in * Dz + X_.dot(C_);
-		matrix::SquareMatrix<float, 8> A_(Az);
-		matrix::Vector<float, 8> B_(Bz);
-		X_ = A_ * X_ + in * B_;
-		X_.copyTo(X);		
-		return out;
-
-	}
-
-};
+// // state space 4 pole filter cooked up from https://github.com/google/music-synthesizer-for-android/blob/master/lab/Zero%20delay%20the%20easy%20way.ipynb
+// // aka "Zero delay the easy way"
+// // float only no vectors
+// // TODO document usage
+// struct ZDFPhaser4 {
+// 
+// 	// analog state space prototype
+// 	// extended from first order section
+// 	// ap = lp - hp = lp - (in - lp) = 2*lp - in
+// 	// A = [-1], B = [1], C = [2], D = [-1]
+// 
+// 	float A[16] = {-1, 0, 0, 0,
+//               	    2, -1, 0, 0,
+//               	   -2, 2, -1, 0,
+//               	    2, -2, 2, -1};
+// 	float B[4] = {1, -1, 1, -1};
+// 	float C[4] = {-2, 2, -2, 2};
+// 	float D = 1;
+// 
+// 	// storage bins for discretized matrixes
+// 	float Az[16] = {-1, 0, 0, 0,
+//               	     2, -1, 0, 0,
+//               	    -2, 2, -1, 0,
+//               	     2, -2, 2, -1};
+// 	float Bz[4] = {1, -1, 1, -1};
+// 	float Cz[4] = {-2, 2, -2, 2};
+// 	float Dz = 1;
+// 
+// 	float X[4] = {0, 0, 0, 0};
+// 
+// 	// discretize with bilinear transform
+// 
+// 	void setParams(float freq, float res) {
+// 
+// 		// freq normalized to sr
+// 		// prewarp for bilinear transform
+// 		float g = tan(M_PI * freq);
+// 		// printf("g: %4.4f \n", g);
+// 
+// 		// sneak in the feedback gain as res 0 - 1
+// 		A[3] = -res;
+// 
+// 		// Inv = (I - gA)^(-1)
+// 		// Inverting the transition matrix solves the system of differential equations
+// 		matrix::SquareMatrix<float, 4> Ag(A);
+// 		Ag *= g;
+// 		matrix::SquareMatrix<float, 4> Inv;
+//     	Inv.setIdentity();
+//     	Inv -= Ag;
+//     	Inv = matrix::inv(Inv);
+// 
+//     	// discretize the transition matrix
+//     	// Az = Inv * (I + gA)
+//     	matrix::SquareMatrix<float, 4> A_;
+//     	A_.setIdentity();
+//     	A_ += Ag;
+//     	A_ = Inv * A_;
+// 
+//     	// discretize the input vector (column)
+//     	// Bz = 2g * Inv * B
+//     	matrix::Vector<float, 4> Bs(B);
+//     	matrix::Vector<float, 4> B_;
+//     	B_ = 2 * g * Inv * Bs;
+// 
+//     	// discretize the output vector (row)
+//     	// Cz = C * Inv
+//     	matrix::Matrix<float, 1, 4> C_;
+//     	matrix::Vector<float, 4> Cs(C);
+//     	C_ = Cs.T() * Inv;
+// 
+//     	// Calculate the direct input feedthrough
+//     	// Prototype D is added when storing
+//     	// Dz = g * C * Inv * B + D
+//     	matrix::Matrix<float, 1, 1> D_;
+//     	D_ = Cs.T() * Inv * (g * Bs);
+//     	
+//     	// store above calculations 
+//     	A_.copyTo(Az);
+//     	B_.copyTo(Bz);
+//     	C_.copyTo(Cz);
+//     	Dz = D_(0, 0) + D;
+// 
+// 	}
+// 
+// 	float process(float in) {
+// 
+// 		// calculate output from current state and current input 
+// 		matrix::Vector<float, 4> X_(X);
+// 		matrix::Vector<float, 4> C_(Cz);
+// 		float out = in * Dz + X_.dot(C_);
+// 
+// 		// update the state for the next input from current input and transition matrix
+// 		matrix::SquareMatrix<float, 4> A_(Az);
+// 		matrix::Vector<float, 4> B_(Bz);
+// 		X_ = A_ * X_ + in * B_;
+// 		// store it
+// 		X_.copyTo(X);
+// 
+// 		// return the output from the first section		
+// 		return out;
+// 
+// 	}
+// 
+// };
+// 
+// // same thing, 8 pole prototype
+// // TODO document usage
+// struct ZDFPhaser8 {
+// 
+// 	float A[64] = {-1, 0, 0, 0, 0, 0, 0, 0,
+//               		2, -1, 0, 0, 0, 0, 0, 0,
+//               		-2, 2, -1, 0, 0, 0, 0, 0,
+//               		2, -2, 2, -1, 0, 0, 0, 0,
+//               		-2, 2, -2, 2, -1, 0, 0, 0,
+//               		2, -2, 2, -2, 2, -1, 0, 0,
+//               		-2, 2, -2, 2, -2, 2, -1, 0,
+//               		2, -2, 2, -2, 2, -2, 2, -1};
+// 	float B[8] = {1, -1, 1, -1, 1, -1, 1, -1};
+// 	float C[8] = {-2, 2, -2, 2, -2, 2, -2, 2};
+// 	float D = 1;
+// 
+// 	float Az[64] = {-1, 0, 0, 0, 0, 0, 0, 0,
+//               		2, -1, 0, 0, 0, 0, 0, 0,
+//               		-2, 2, -1, 0, 0, 0, 0, 0,
+//               		2, -2, 2, -1, 0, 0, 0, 0,
+//               		-2, 2, -2, 2, -1, 0, 0, 0,
+//               		2, -2, 2, -2, 2, -1, 0, 0,
+//               		-2, 2, -2, 2, -2, 2, -1, 0,
+//               		2, -2, 2, -2, 2, -2, 2, -1};
+// 	float Bz[8] = {1, -1, 1, -1};
+// 	float Cz[8] = {-2, 2, -2, 2};
+// 	float Dz = 1;
+// 
+// 	float X[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+// 
+// 
+// 	void setParams(float freq, float res) {
+// 
+// 		float g = tan(M_PI * freq);
+// 
+// 		A[7] = -res;
+// 
+// 		matrix::SquareMatrix<float, 8> Ag(A);
+// 		Ag *= g;
+// 		matrix::SquareMatrix<float, 8> Inv;
+//     	Inv.setIdentity();
+//     	Inv -= Ag;
+//     	Inv = matrix::inv(Inv);
+// 
+//     	matrix::SquareMatrix<float, 8> A_;
+//     	A_.setIdentity();
+//     	A_ += Ag;
+//     	A_ = Inv * A_;
+// 
+//     	matrix::Vector<float, 8> Bs(B);
+//     	matrix::Vector<float, 8> B_;
+//     	B_ = 2 * g * Inv * Bs;
+// 
+//     	matrix::Matrix<float, 1, 8> C_;
+//     	matrix::Vector<float, 8> Cs(C);
+//     	C_ = Cs.T() * Inv;
+// 
+//     	matrix::Matrix<float, 1, 1> D_;
+//     	D_ = Cs.T() * Inv * (g * Bs);
+// 
+//     	A_.copyTo(Az);
+//     	B_.copyTo(Bz);
+//     	C_.copyTo(Cz);
+//     	Dz = D_(0, 0) + D;
+// 
+// 	}
+// 
+// 	float process(float in) {
+// 
+// 		matrix::Vector<float, 8> X_(X);
+// 		matrix::Vector<float, 8> C_(Cz);
+// 		float out = in * Dz + X_.dot(C_);
+// 		matrix::SquareMatrix<float, 8> A_(Az);
+// 		matrix::Vector<float, 8> B_(Bz);
+// 		X_ = A_ * X_ + in * B_;
+// 		X_.copyTo(X);		
+// 		return out;
+// 
+// 	}
+// 
+// };
 
 // Classic maligned JOS Chamberlin SVF discretized with forward/backward euler, unstable above ~ sr/6
 // TODO document usage
